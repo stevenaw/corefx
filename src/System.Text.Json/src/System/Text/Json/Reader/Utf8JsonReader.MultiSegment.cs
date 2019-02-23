@@ -2083,31 +2083,53 @@ namespace System.Text.Json
         private bool SkipSingleLineCommentMultiSegment(ReadOnlySpan<byte> localBuffer, int leftOver)
         {
             long prevTotalConsumed = _totalConsumed;
-            int idx;
+            int idx = -1;
+            bool expectLF = false;
             do
             {
-                // TODO: https://github.com/dotnet/corefx/issues/33293
-                idx = localBuffer.IndexOf(JsonConstants.LineFeed);
-                if (idx == -1)
+                if (expectLF)
                 {
-                    if (IsLastSpan)
+                    if (localBuffer[0] == JsonConstants.LineFeed)
                     {
-                        idx = localBuffer.Length;
-                        // Assume everything on this line is a comment and there is no more data.
-                        _bytePositionInLine += 2 + localBuffer.Length;
-                        goto Done;
+                        idx++;
                     }
-
-                    if (!GetNextSpan())
-                    {
-                        _totalConsumed = prevTotalConsumed;
-                        return false;
-                    }
-                    _totalConsumed += localBuffer.Length + leftOver;
-                    leftOver = 0;
-                    localBuffer = _buffer;
+                    break;
                 }
-            } while (idx == -1);
+                idx = localBuffer.IndexOfAny(JsonConstants.CarriageReturn, JsonConstants.LineFeed);
+                if (idx != -1)
+                {
+                    if (localBuffer[idx] == JsonConstants.LineFeed)
+                    {
+                        break;
+                    }
+                    if ((idx + 1) < localBuffer.Length)
+                    {
+                        if (localBuffer[idx + 1] == JsonConstants.LineFeed)
+                        {
+                            idx++;
+                        }
+                        break;
+                    }
+                    expectLF = true;
+                }
+                if (IsLastSpan)
+                {
+                    idx = localBuffer.Length;
+                    // Assume everything on this line is a comment and there is no more data.
+                    _bytePositionInLine += 2 + localBuffer.Length;
+                    goto Done;
+                }
+
+                if (!GetNextSpan())
+                {
+                    _totalConsumed = prevTotalConsumed;
+                    return false;
+                }
+                _totalConsumed += localBuffer.Length + leftOver;
+                leftOver = 0;
+                localBuffer = _buffer;
+                idx = -1;
+            } while (true);
 
             idx++;
             _bytePositionInLine = 0;
@@ -2242,32 +2264,55 @@ namespace System.Text.Json
         private bool ConsumeSingleLineCommentMultiSegment(ReadOnlySpan<byte> localBuffer, int leftOver, SequencePosition start, int previousConsumed)
         {
             long prevTotalConsumed = _totalConsumed;
-            int idx;
+            int idx = -1;
+            bool expectLF = false;
             do
             {
-                // TODO: https://github.com/dotnet/corefx/issues/33293
-                idx = localBuffer.IndexOf(JsonConstants.LineFeed);
-                if (idx == -1)
+                if (expectLF)
                 {
-                    if (IsLastSpan)
+                    if (localBuffer[0] == JsonConstants.LineFeed)
                     {
-                        idx = localBuffer.Length;
-                        // Assume everything on this line is a comment and there is no more data.
-                        _bytePositionInLine += 2 + localBuffer.Length;
-                        goto Done;
-                    }
-
-                    if (!GetNextSpan())
-                    {
-                        _totalConsumed = prevTotalConsumed;
-                        return false;
+                        idx++;
                     }
                     HasValueSequence = true;
-                    _totalConsumed += localBuffer.Length + leftOver;
-                    leftOver = 0;
-                    localBuffer = _buffer;
+                    break;
                 }
-            } while (idx == -1);
+                idx = localBuffer.IndexOfAny(JsonConstants.CarriageReturn, JsonConstants.LineFeed);
+                if (idx != -1)
+                {
+                    if (localBuffer[idx] == JsonConstants.LineFeed)
+                    {
+                        break;
+                    }
+                    if ((idx + 1) < localBuffer.Length)
+                    {
+                        if (localBuffer[idx + 1] == JsonConstants.LineFeed)
+                        {
+                            idx++;
+                        }
+                        break;
+                    }
+                    expectLF = true;
+                }
+                if (IsLastSpan)
+                {
+                    idx = localBuffer.Length;
+                    // Assume everything on this line is a comment and there is no more data.
+                    _bytePositionInLine += 2 + localBuffer.Length;
+                    goto Done;
+                }
+
+                if (!GetNextSpan())
+                {
+                    _totalConsumed = prevTotalConsumed;
+                    return false;
+                }
+                HasValueSequence = true;
+                _totalConsumed += localBuffer.Length + leftOver;
+                leftOver = 0;
+                localBuffer = _buffer;
+                idx = -1;
+            } while (true);
 
             idx++;
             _bytePositionInLine = 0;

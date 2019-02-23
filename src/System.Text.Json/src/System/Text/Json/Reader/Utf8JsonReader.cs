@@ -1709,31 +1709,39 @@ namespace System.Text.Json
 
         private bool SkipSingleLineComment(ReadOnlySpan<byte> localBuffer, out int idx)
         {
-            idx = localBuffer.IndexOfAny(JsonConstants.LineFeed, JsonConstants.CarriageReturn);
-            if (idx == -1)
+            idx = localBuffer.IndexOfAny(JsonConstants.CarriageReturn, JsonConstants.LineFeed);
+            if (idx != -1)
             {
-                if (IsLastSpan)
+                if (localBuffer[idx] == JsonConstants.LineFeed)
                 {
-                    idx = localBuffer.Length;
-                    // Assume everything on this line is a comment and there is no more data.
-                    _bytePositionInLine += 2 + localBuffer.Length;
-                    goto Done;
+                    goto EndOfComment;
                 }
+                if ((idx + 1) < localBuffer.Length)
+                {
+                    if (localBuffer[idx + 1] == JsonConstants.LineFeed)
+                    {
+                        idx++;
+                    }
+                    goto EndOfComment;
+                }
+            }
+            if (IsLastSpan)
+            {
+                idx = localBuffer.Length;
+                // Assume everything on this line is a comment and there is no more data.
+                _bytePositionInLine += 2 + localBuffer.Length;
+                goto Done;
+            }
+            else
+            {
                 return false;
             }
 
-            // If we have encountered \r, check and advance index if next character is \n
-            if (localBuffer[idx] == JsonConstants.CarriageReturn 
-                && idx < localBuffer.Length - 1
-                && localBuffer[idx + 1] == JsonConstants.LineFeed)
-            {
-                idx++;
-            }
-
-
+        EndOfComment:
             idx++;
             _bytePositionInLine = 0;
             _lineNumber++;
+
         Done:
             _consumed += 2 + idx;
             return true;
